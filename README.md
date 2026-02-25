@@ -39,6 +39,9 @@ del método padre
 
 -Se orquesta el flujo conforme un bloque de negocio termina una actividad, sin una orquesta central, pero eventual. Se le denomina coreografía.
 
+<img width="2250" height="2624" alt="image" src="https://github.com/user-attachments/assets/441b15f3-7c92-40f4-a685-8bd9f51035ff" />
+
+
 Esos son los dos tipos de SAGA: orquestación y coreografía. Hay un ejemplo más detallado acá https://microservices.io/patterns/data/saga.html
 ¿Cuáles son las desventajas de SAGA? inconsistencias, puede haber n eventos que tengan el estado anterior y no el actual que probablemente un saga
 ya actualizó. Ahí entra en concepto la eventual consistencia.
