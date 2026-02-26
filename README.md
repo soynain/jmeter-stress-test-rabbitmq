@@ -46,6 +46,13 @@ Esos son los dos tipos de SAGA: orquestación y coreografía. Hay un ejemplo má
 ¿Cuáles son las desventajas de SAGA? inconsistencias, puede haber n eventos que tengan el estado anterior y no el actual que probablemente un saga
 ya actualizó. Ahí entra en concepto la eventual consistencia.
 
+## Avances 25/02/2026
+
+Para poder estructurar mejor mis sagas y poder crear una arquitectura escalable para un ejemplo de saga's con varias peticiones en un entorno
+con un contenedor con 100 mb de recursos para el broker de mensajes y 80 mb para los dos micros, quise darme un repaso por la arquitectura hexagonal.
+
+No desglosaré la explicación de la arquitectura hexagonal, ya que para estudiarlo mejor he hecho apuntes a mano.
+
 
 
 
