@@ -54,6 +54,84 @@ con un contenedor con 100 mb de recursos para el broker de mensajes y 80 mb para
 No desglosaré la explicación de la arquitectura hexagonal, ya que para estudiarlo mejor he hecho apuntes a mano.
 
 
+## Avances 26/02/2026
 
+Hoy definiremos un resumen de la arquitectura hexagonal, para esto hice apuntes a mano y también ya he absorbido estrategias principales
+para la estructuración interactiva de los microservicios.
 
+## Arquitectura hexagonal
 
+Arquitectura de interacción entre aplicaciones, que posibilita la separación a nivel aplicación de las responsabilidades
+de negocio aparte de las maneras en que la aplicación interactua con entidades externas.
+
+Quiere decir que tu aplicación no depende de implementaciones de librerias predeterminadas, de librerias de bases de datos o de
+clientes para API's. Lo cual facilita tu testing.
+
+La estructura va asi:
+
+````markdown.md
+*Infraestructure*
+  *Adapters
+    *In
+      ExampleController.java
+    *Out
+      UsersRepository.java
+    *Entities
+      *UserEntity.java
+*Application
+  *services
+    UsersService.java
+  *mappers
+    *UsersMappers.java
+*Domain
+  *ports
+    *in
+      RegisterUserUseCase.java
+      DeleteUserUseCase.java
+    *out
+      UserRepositoryPort.java
+      *impl
+        UserRepositoryPortImpl.java
+  *models
+      UserRequestDto.java
+````
+
+Este es un markdown improvisado basado en varios ejemplos de esta arquitectura, así como los estándares actuales. Dominio
+no depende de ninguna capa, aplicación depende de la capa de dominio y de infraestructura, e infra depende de dominio también.
+
+Los Use case son interfaces, que se heredan a los services, los ports se inyectan por DI hacia los services también, y en su IMPL
+tu inyectas los repository's de la capa de infraestructura, algún mapper e implementando la interfaz del port. Con eso defines la funcionalidad del
+port que inyectas a services y haces tu código más mockeable. Aprenderte esta arquitectura automáticamente te hace conocedor de
+las implementaciones Domain Driven Design.
+
+## Estrategias de definición de microservicios
+
+Tus micros deben estar bien definidos, todo parte de la parte central de una aplicación
+que se denomina service, tu hexagonal es un service, los packages: tus subdominios.
+
+En muchos lugares se catalogan los micros de manera diferente, en un lugar donde trabajé lo llamaban taxonomía,
+aunque era un término zonso y fancy para la homologación conjunta de estándar RESTFUL y de services.
+
+Pero en manera más genéricas, un service tiene subdominios que pueden representar modulos que se comunican entre si o tienen relación.
+
+De acuerdo a Chris Richardson, para definir los micros en resumidas se resume en 4 pasos:
+
+1.Define tus endpoints en un preflujo borrador y los métodos de los mismos (o diagrama UML de secuencia o a mano como te acomodes), 
+
+2.Esas operaciones categorizalas por subdominios de acuerdo a las tablas o entidades que ya hayas identificado, si
+tu operación toca x tablas, guiate de eso para ir definiendo tus subdominios
+
+4.Separación de responsabilidades de las operaciones definidas y de los subdominios, para esto
+debes pensar en si creas nuevos subdominios de acuerdo a ese nuevo feature que estás implementando,
+y verificar si sale mejor separarlo en un service separado o integrarlo en un service existente, todo esto
+de acuerdo a la complejidad y viabilidad de la operación, ya que sale mejor en algunos escenarios
+agrupar las operaciones en un solo service sin usar saga, y en otros escenarios sale mejor usar SAGA
+para la sincronización de los mismos, estos sin salirnos de la arquitectura de microservicios 
+
+Todo esto depende de la relevancia de la entidad que estás creando, así como los tiempos de desarrollo.
+
+5. Evaluación de lo aplicado anteriormente
+
+6. Rerfactorización o división a más subdominios si algo falla sobre lo resultante.
+
+Seguiremos estudiando ahora los patrones a mano para SAGAS, y los iremos resumiendo sobre esta sección previo a la práctica.
