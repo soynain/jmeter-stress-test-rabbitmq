@@ -241,4 +241,32 @@ se suscriben para en base al estado actual de una transacción, poder re procesa
 
 El esquema para estos eventos va de la siguiente forma, de acuerdo a este diagrama:
 
+<img width="1451" height="851" alt="event_store_structure drawio" src="https://github.com/user-attachments/assets/202989ef-2bc1-4c8b-b865-009244dd3f2e" />
 
+El esquema general del event sourcing se compone de dos tablas:
+
+**event store**
+Un esquema que nos sirve para guardar el historico de eventos. Imagina que tu usas un SAGA ya sea orquestado o por coreografía. 
+Por cada evento tu creas un tópico con un nombre, y el método para mandar ese tópico tiene un nombre, puedes reforzar el historial
+de tus eventos incluyendo ambos en columnas separadas, un uuid unico de la fila, un uuid para el objeto o entidad, timestamps,
+el payload del objeto que puedes guardar completamente o removiendo propiedades para eliminar peso en tu json. La columna más importante
+es el "version", ese version te sirve para SIEMPRE tener el orden de ejecución de tus eventos.
+
+La tabla snapshot obtiene la versión más alta de un conjunto de eventos ejecutados. Esto nos permite la obtención de los objetos sin
+necesidad de reproducir todos los eventos.
+
+Puede haber escenarios donde necesites reproducir los eventos otra vez: probablemente para debuguear comportamiento!!. Para eso te sirve
+este historial también. También puedes implementar versionados desde los pojos y nombrar a tus eventos con prefijos OrderCreatedV2..V3... etc
+para obtener un contrato más versionado, obteniendo una compatibilidad entre contratos.
+
+La desventaja es que al serializar tus objetos a JSON, tus consultas pueden ser más dificiles en cuestión de unificar, osea más aun de lo que es...
+
+Ahí entra en juego CQRS, significa que disparas dos eventos por separado o crear un cron job que haga polling sobre los registros para crear tus vistas, pero
+lo más apropiado es que sincronizes tus vistas por broker, tu *source of truth* se vuelve el event store y tu reader se vuelve las vistas que generes con esos eventos.
+
+La tabla de snapshots te puede servir más para esos escenarios, cuando tengas el estado final de ese evento, disparas un evento provisional para que comienzen tales sincronizaciones.
+
+¿Vas viendo esos escenarios cierto? más micros, tablas y necesidades de consultas, recaen en que tengas que crear más tópicos, más sincronismos, por lo tanto más supervisión
+y que necesites un equipo más gigante.
+
+Por eso siempre se recalca que no todos estos patrones los debes aplicar a fuerza, pero con esto tienes el panorama de porque mencionan que esta arquitectura es compleja.
