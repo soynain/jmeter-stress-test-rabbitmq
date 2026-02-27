@@ -161,7 +161,9 @@ TRÁFICO, disminuir consumo de recursos, descentralizar. Pero seguimos, en un es
 ¿Qué estrategias se pueden seguir para tener el patrón *Database-Per-Service*?
 
 *Table-per-service* = Nomás asignas una tabla por service, lo más "sencillo"
+
 *Schema-per-service* = Un create database por service, permite crear grants y revokes por servicio para controlar el acceso a los recursos.
+
 *Database-per-service* = Una instancia por servicio, solo en casos DE MUUUUCHO TRÁFICO, MILLONES, no miles.
 
 Si tu implementas el segundo escenario... ponle que en postgress al ser orientado a objetos o incluso en mysql puedes hacer query's entre esquemas, claro está.
