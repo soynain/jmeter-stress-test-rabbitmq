@@ -221,3 +221,24 @@ voy a explicar los tipicos escenarios de error en un SAGA simple:
 
 <img width="921" height="2116" alt="diagrama_event_source drawio" src="https://github.com/user-attachments/assets/8ca9576d-b0bd-4604-9866-59d82fe34d47" />
 
+El deber ser de una saga es, asegurar el orden de los eventos, si tienes una transacción que dispara un evento, deben ejecutarse en el orden en que
+se orquestan:
+
+T1->E1 => T2->E2
+
+Si tienes 5 transacciones, se mandan 5 eventos, y si tienes otras 5 transacciones, se ejecutan después de las primeras 5 transacciones
+y los eventos después de los primeros 5 eventos, es consecutivo y en orden.
+
+De acuerdo al diagrama que hemos visto, aquí viene el primer patrón complementario a CRQS que vamos a tocar:
+
+## Event sourcing
+
+Es un patrón que asegura orden, atomicidad y garantía de sincronía de datos entre una o más entidades. Y también nos ayuda a asegurar que, si una transacción hace rollback,
+el mensaje no debe ser enviado.
+
+Esto es un nuevo paradigma, ya que te obliga a tratar tus tablas como entidades, te empuja a crear una tabla de eventos en la cual los consumers
+se suscriben para en base al estado actual de una transacción, poder re procesar los eventos.
+
+El esquema para estos eventos va de la siguiente forma, de acuerdo a este diagrama:
+
+
