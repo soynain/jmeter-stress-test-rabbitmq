@@ -104,6 +104,11 @@ tu inyectas los repository's de la capa de infraestructura, algún mapper e impl
 port que inyectas a services y haces tu código más mockeable. Aprenderte esta arquitectura automáticamente te hace conocedor de
 las implementaciones Domain Driven Design.
 
+Esta imagen de referencia es la que encontré más útil
+
+<img width="1536" height="1194" alt="image" src="https://github.com/user-attachments/assets/524e05cb-747b-4422-880b-de33d2d45b53" />
+
+
 ## Estrategias de definición de microservicios
 
 Tus micros deben estar bien definidos, todo parte de la parte central de una aplicación
@@ -130,8 +135,77 @@ para la sincronización de los mismos, estos sin salirnos de la arquitectura de 
 
 Todo esto depende de la relevancia de la entidad que estás creando, así como los tiempos de desarrollo.
 
-5. Evaluación de lo aplicado anteriormente
+5.Evaluación de lo aplicado anteriormente
 
-6. Rerfactorización o división a más subdominios si algo falla sobre lo resultante.
+6.Rerfactorización o división a más subdominios si algo falla sobre lo resultante.
 
 Seguiremos estudiando ahora los patrones a mano para SAGAS, y los iremos resumiendo sobre esta sección previo a la práctica.
+
+## Avances 27/02/2026
+
+Muchos patrones de microservicios promueven la eventual consistencia, que es un concepto que consiste en
+diseñar arquitecturas asíncronas, no interacciones asincronas. ¿Qué quiere decir esto? que una transacción
+pierde su isolación de los principios ACID. Un ejemplo es un inventario de compras en línea, si lo diseñas con
+eventual consistencia, muchas peticiones concurrentes te van a disminuir el inventario y encontrarás escenarios donde
+tengas inventarios negativos también, para eso creas un query que valide que hay inventario mayor a 0, si tu transacción
+valida la compra de un producto con nada de inventarios y está en ceros, debes bloquear esas peticiones y deshacer operaciones 
+predecesoras.
+
+Suena fácil, pero no es fácil de implementar. Pero nos estamos adelantando. ¿Ya se hacen una idea de la complejidad
+de los micros?
+
+Iremos por partes pero tengan esta problemática en mente. Tienes micros separados, la regla de los micros es que tengan su propia base, recuerden
+que al diseñar o implementar micros, no debes DE CAJÓN implementar todos los conceptos, el propósito de un micro es desglosar monolitos, ESPARCER
+TRÁFICO, disminuir consumo de recursos, descentralizar. Pero seguimos, en un escenario normal, micro = bdd única.
+
+¿Qué estrategias se pueden seguir para tener el patrón *Database-Per-Service*?
+
+*Table-per-service* = Nomás asignas una tabla por service, lo más "sencillo"
+*Schema-per-service* = Un create database por service, permite crear grants y revokes por servicio para controlar el acceso a los recursos.
+*Database-per-service* = Una instancia por servicio, solo en casos DE MUUUUCHO TRÁFICO, MILLONES, no miles.
+
+Si tu implementas el segundo escenario... ponle que en postgress al ser orientado a objetos o incluso en mysql puedes hacer query's entre esquemas, claro está.
+Pero dependiendo de los datos y la magnitud de ese tráfico, tu haces joins y eso al gestor le cuesta. Aquí entra otro concepto interesante.
+
+## CQRS
+Patrón arquitectónico que permite la separación de responsabilidades de lectura y escritura, compuesto por varios subdominios fusionados.
+
+Qué quiere decir esto? que puedes usar dos tablas o dos bases de datos, una tabla de lectura con indices, no normalizada, pero hecha
+para consultas rapiditas y otro para lectura, normalizada, sin indices más que solo el primary key, ya que indices ralentizan las inserciones
+al igual que los constraints. O también añadir complejidad y trabajo extra sincronizando dos bdd's, un mongo db para lecturas y un relacional 
+para escritura.
+
+La idea es que así puedes crear diferentes vistas, fusionando esas entidades que por defecto están separadas.
+
+¿Cuál es su desventaja? exacto!! la eventual consistencia, puede tardar unos milisegundos o segundos en reflejar el cambio, y si son varios eventos encolados??
+o escalas u optimizas. ¿Capish? y además asegurar la atomicidad e isolación de esas transacciones con otras estrategias.
+
+Considera que en industrias criticas, la eventual consistencia siempre se debe de enfocar a modulos que no sean criticos,
+transacciones que puedan tolerar ese delay, pero si tienes una vista y mandas una info desactualizada... tu *source of truth* es la base de lectura SIEMPRE!!!!,
+exacto, tus validaciones en codigo siempre sobre los writes, nunca sobre los read. Los read son para consultas o vistas.
+
+Ahora, para consultas múltiples hay otra estrategia más sencillita que va concorde a, tus migraciones o muuuy pequeñas arquitecturas:
+
+## API Composition
+
+Nomás consiste en, simplemente hacer endpoints, llamarlos, y hacer filtrado y joins en memoria, puedes usar api gateway, curls secuenciales o concurrentes, 
+graphQL, te facilitas la vida.
+
+¿Ves como no todo se debe aplicar de cajón? mucho cuidado enserio, piensa en la escalabilidad y que modulos reciben más tráfico para esas consideraciones.
+
+*Api composition y CQRS* sirven para la consulta de datos en sistemas distribuidos. Si vamos al escenario más complejo que es CQRS, 
+tenemos que asegurarnos de un escenario en particular que es, ¿cómo orientas tu arquitectura? lo iremos viendo.
+
+
+Estos conceptos los hemos estudiado a mano
+
+https://learn.microsoft.com/es-es/azure/architecture/patterns/cqrs
+
+https://microservices.io/patterns/data/domain-event.html
+
+https://microservices.io/patterns/data/domain-event.html
+
+https://microservices.io/patterns/data/domain-event.html
+
+Un recordatorio de que estos conceptos si son muy importantes de aprenderlos, en las grandes ciudades estos protocolos y gobernanzas
+son fuertemente seguidos y estandarizados!!!
