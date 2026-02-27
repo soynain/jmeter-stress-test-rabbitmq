@@ -186,12 +186,17 @@ Considera que en industrias criticas, la eventual consistencia siempre se debe d
 transacciones que puedan tolerar ese delay, pero si tienes una vista y mandas una info desactualizada... tu *source of truth* es la base de lectura SIEMPRE!!!!,
 exacto, tus validaciones en codigo siempre sobre los writes, nunca sobre los read. Los read son para consultas o vistas.
 
-Ahora, para consultas múltiples hay otra estrategia más sencillita que va concorde a, tus migraciones o muuuy pequeñas arquitecturas:
+<img width="807" height="775" alt="image" src="https://github.com/user-attachments/assets/db9d400b-66c0-415e-973c-99b8226ac655" />
+
+
+Ahora, para consultas múltiples hay otra estrategia más sencillita que va concorde a, tus migraciones o muuuy pequeñas arquitecturas.
 
 ## API Composition
 
 Nomás consiste en, simplemente hacer endpoints, llamarlos, y hacer filtrado y joins en memoria, puedes usar api gateway, curls secuenciales o concurrentes, 
 graphQL, te facilitas la vida.
+
+<img width="474" height="320" alt="image" src="https://github.com/user-attachments/assets/12fb8145-b96b-479d-b36d-f3d9da5cdc4f" />
 
 ¿Ves como no todo se debe aplicar de cajón? mucho cuidado enserio, piensa en la escalabilidad y que modulos reciben más tráfico para esas consideraciones.
 
@@ -205,9 +210,14 @@ https://learn.microsoft.com/es-es/azure/architecture/patterns/cqrs
 
 https://microservices.io/patterns/data/domain-event.html
 
-https://microservices.io/patterns/data/domain-event.html
-
-https://microservices.io/patterns/data/domain-event.html
-
 Un recordatorio de que estos conceptos si son muy importantes de aprenderlos, en las grandes ciudades estos protocolos y gobernanzas
 son fuertemente seguidos y estandarizados!!!
+
+
+## Modalidades de CQRS y un deep-check sobren los sistemas event driven (Avances 27/02/2026)
+
+Es fácil a primera vista decir: pues todos mis payloads los sincronizo mandando eventos a las tablas, antes que nada,
+voy a explicar los tipicos escenarios de error en un SAGA simple:
+
+<img width="921" height="2116" alt="diagrama_event_source drawio" src="https://github.com/user-attachments/assets/8ca9576d-b0bd-4604-9866-59d82fe34d47" />
+
