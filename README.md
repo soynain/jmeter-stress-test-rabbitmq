@@ -311,3 +311,8 @@ comportamiento asincrono por aplicación pero en general sobre ciertos flujos.
 
 Ahora sí, más adelante indagaremos en... implementar transactional outbox y usar JMeter tal vez para tratar de trigerearlos.
 
+https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+
+https://www.milanjovanovic.tech/blog/implementing-the-outbox-pattern
+
+https://spring.io/blog/2023/10/24/a-use-case-for-transactions-adapting-to-transactional-outbox-pattern
