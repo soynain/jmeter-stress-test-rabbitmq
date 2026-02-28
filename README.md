@@ -322,4 +322,80 @@ Ahora procederemos a, implementar un ejemplo de transactional outbox con Kafka e
 con el esquema de ejemplo de outbox, un spring app sin controller con CommandLineRunner para el relay y el producer, y otro jar con un simple endpoint
 para trigerear el evento, implementar esas estrategias y reproducir escenarios.
 
+Para la entidad de ejemplo usaremos los siguientes esquemas:
 
+````file.sql
+CREATE TABLE Person (
+    id INT PRIMARY KEY,
+    name VARCHAR(255),
+    age INT,
+    city VARCHAR(255)
+);
+
+
+
+CREATE TABLE outbox_messages (
+    id SERIAL PRIMARY KEY,
+    entity_id INT NOT NULL,
+    version int not null,
+    type VARCHAR(255) NOT NULL,
+    payload JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+````
+
+Como ya hemos visto en las otras prácticas, solo configura un producer simulado, por medio de un getter:
+
+````file.java
+@Service
+public class BasicService {
+
+    @Autowired
+    private KafkaTemplate<String, ExampleEntity> kafkaTemplate;
+
+    public void sendEvent() {
+        ExampleEntity exampleEntity = ExampleEntity.builder()
+                .name(String.valueOf(String.valueOf(new Random().nextInt(100000)).hashCode()))
+                .id(new Random().nextInt(100000))
+                .age(new Random().nextInt(100))
+                .city("New York")
+                .build();
+
+        System.out.println(exampleEntity.toString());
+        kafkaTemplate.send("outbox-ejemplo", exampleEntity);
+    }
+}
+````
+
+Nos basamos en otras prácticas para levantar una prueba de kafka en docker, y por medio del get enviamos los eventos:
+
+<img width="1206" height="1021" alt="image" src="https://github.com/user-attachments/assets/efd9694a-3be2-4417-8681-2ca6ede626c5" />
+
+<img width="1376" height="275" alt="image" src="https://github.com/user-attachments/assets/d3439965-743f-4121-b167-73573a861eea" />
+
+Falta el consumer, fácil también (no nos metamos en particiones por ahora):
+
+````file.java
+@Service
+public class MessageReceiverService {
+
+    @KafkaListener(topics = "outbox-ejemplo", containerFactory = "kafkaListenerContainerFactory")
+    public void greetingListener(ExampleEntity message) {
+        // process greeting message
+
+        System.out.println("Received Message in group outbox-ejemplo: " + message.toString());
+    }
+
+}
+
+````
+
+<img width="1550" height="667" alt="image" src="https://github.com/user-attachments/assets/f7626ea4-3b23-4a66-9951-8357b7971b64" />
+
+Con esto ya comunicamos dos micros por saga, ahora, como se orquesta el saga entre estos dos?
+
+
+Micro b  guardaria la transacción, la responsabilidad de la saga va de la mano de JPA con @Transactional,
+uno para la tabla normal y otro para la tabla outbox.
+
+La ventaja que te trae es que haces ambas transacciones al mismo tiempo.
