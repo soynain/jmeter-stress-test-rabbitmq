@@ -270,3 +270,44 @@ La tabla de snapshots te puede servir más para esos escenarios, cuando tengas e
 y que necesites un equipo más gigante.
 
 Por eso siempre se recalca que no todos estos patrones los debes aplicar a fuerza, pero con esto tienes el panorama de porque mencionan que esta arquitectura es compleja.
+
+A continuación veremos otro patrón que también tiene su nivel de complejidad, y haremos unos comparativos:
+
+## Transactional outbox
+
+Me parece que este es el más común de aplicar. Resuelve el mismo problema que el anterior pero con otro approach.
+
+<img width="1298" height="461" alt="image" src="https://github.com/user-attachments/assets/59f3bcf4-cf6e-43db-b0a3-1bf23ceb732a" />
+
+Es más sencillo de implementar que event sourcing, ya que establece que puedes usar tu patrón *Database per service* de manera normal,
+crearás la misma tabla que usas para event sourcing que denominarás outbox_table, pero ya no será tu *source of truth*, serán las tablas normales 
+que optimizarás para escritura.
+
+Son de hecho muy semejantes, si tu sistema es full event driven y requieres reconstrucción de eventos y versionado de contratos vete
+por event sourcing. Si solo requieres un helper para garantizar una sola entrega de tus eventos sobre orquestaciones saga de manera asincrona
+y de sub tareas separadas que no estén acoplados [que no dependan tan secuencialmente], outbox es la más común y sencilla de aplicar.
+
+Volviendo al diagrama, el message relay es un cron job que basicamente hacer pulling por intertvalos para mandarlos por medio de un broker al otro micro.
+
+Para escalar relays, una, aumenta el intervalo por batches de las consultas, y que estas sean asincronas, dos, aumenta el número de pods del relay
+conforme los eventos crecen, ya que tu tabla será acid aun.
+
+¿Cuál es la diferencia entre event sourcing y transactional outbox aparte de lo ya analizado? sus implementaciones, y los métodos de subscripción.
+
+Yendo hacia el lado del stack, las bdd's relacionales tienen el CDC que es un log que MySQL usa para guardar logs de las operaciones, resultando
+en una lectura un poco más rápida, Debezium es una herramienta que lee ese log y lo dirige al broker directamente, se le conoce a esto como
+*Transaction log tailling* y con esto se implementa la susbcripción del event sourcing.
+
+Para el outbox también puedes usar el transaction log pero para quitar complejidades, puedes depender modernamente de un jar que solo haga pulling,
+ a lo mejor si lo escalasa y asignas buen recurso, puedas aumentar la eficiencia de los pods de los workers con hilos, pero depende de infra ahí. 
+ Ahí solo es eso y los mandas asincronamente al broker listener.
+
+Y si, en transactional outbox también implementas CQRS.
+
+Ahora si ya vimos las dos maneras de implementar SAGA's de acuerdo a las arquitecturas que estés proponiendo, y te vuelvo a recordar:
+una arquitectura se diseña y escala en base a necesidades crecientes SIEMPRE. Nunca implementes por moda, por lo general en micros escenciales
+es mucho mejor depender de HTTP y asincronismo que sincronias con eventual consistencia, al menos que seas transacciones de ARQUITECTURA ASÍNCRONA,no
+comportamiento asincrono por aplicación pero en general sobre ciertos flujos.
+
+Ahora sí, más adelante indagaremos en... implementar transactional outbox y usar JMeter tal vez para tratar de trigerearlos.
+
