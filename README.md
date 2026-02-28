@@ -316,3 +316,10 @@ https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
 https://www.milanjovanovic.tech/blog/implementing-the-outbox-pattern
 
 https://spring.io/blog/2023/10/24/a-use-case-for-transactions-adapting-to-transactional-outbox-pattern
+
+
+Ahora procederemos a, implementar un ejemplo de transactional outbox con Kafka en este caso porque lo tengo configurado, una tabla que crearemos
+con el esquema de ejemplo de outbox, un spring app sin controller con CommandLineRunner para el relay y el producer, y otro jar con un simple endpoint
+para trigerear el evento, implementar esas estrategias y reproducir escenarios.
+
+
