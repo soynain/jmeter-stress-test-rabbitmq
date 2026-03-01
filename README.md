@@ -399,3 +399,290 @@ Micro b  guardaria la transacción, la responsabilidad de la saga va de la mano 
 uno para la tabla normal y otro para la tabla outbox.
 
 La ventaja que te trae es que haces ambas transacciones al mismo tiempo.
+
+Para nosotros obtener el resultado del transactional outbox como aquí:
+
+<img width="1466" height="331" alt="image" src="https://github.com/user-attachments/assets/ec378f78-d134-4a2a-bdd0-203ee328e697" />
+
+Es tán simple (en escenarios batch crear micro transacciones o estrategias), como declarar una transacción manejada automáticamente
+para que al primer rollback, todas las inserciones dentro de ese bloque no lleguen a la bdd, cuando terminen
+las últimas transacciones de ese método, se hace commit y el message relay no lo detectará
+
+````main.java
+@Transactional
+    public void sendEvent() {
+        ExampleEntity exampleEntity = ExampleEntity.builder()
+                .name(String.valueOf(String.valueOf(new Random().nextInt(100000)).hashCode()))
+               // .id(new Random().nextInt(100000))
+                .age(new Random().nextInt(100))
+                .city("New York")
+                .build();
+
+        System.out.println(exampleEntity.toString());
+
+        /**
+         * No mandas el evento por este medio, le corresponde al message relay
+         * encargarse de ello
+         */
+        repository.saveAndFlush(exampleEntity);
+
+        /** Y guardas en la tabla de outbox */
+        OutboxEntity outboxEntity;
+        try {
+            outboxEntity = OutboxEntity.builder()
+                    .entityId(exampleEntity.getId())
+                   .type("sendEvent")
+                    .payload(objectMapper.writeValueAsString(exampleEntity))
+                    .build();
+                    outboxTableRepository.save(outboxEntity);
+        } catch (JsonProcessingException e) {
+            // TODO Auto-generated catch block
+           throw new RuntimeException(e);
+        }
+        
+
+        /** Esto ya no aplica, al menos que fuera event sourcing */
+        // kafkaTemplate.send("outbox-ejemplo", exampleEntity);
+    }
+
+````
+Para que no se te pierda nada, usa estrategias de retry con Reslience4J para re intentar una transacción x veces.
+
+Para la entidad del outbox queda definido asúi, con un contador iniciado en 0 gracias a  @Version
+
+````main.java
+package com.kafkamicroa.app.entities;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+@Entity
+@Table(name = "outbox_messages")
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@Setter
+@ToString
+@Builder
+
+public class OutboxEntity {
+
+    private static final long serialVersionUID = 132123132131L;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "entity_id", nullable = false)
+    private Integer entityId;
+
+    @Version
+    private Integer version;
+
+    @Column(nullable = false, length = 255)
+    private String type;
+
+    @Column(nullable = false, columnDefinition = "json")
+    private String payload;
+
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
+}
+
+````
+
+Para el message relay, tenemos que hacer un micro sencillo, con la ayuda del commandlinerunner que resulta ser muy ligerisimo.
+
+
+
+
+
+
+
+Y así quedaría el resultado de nuestra implementación, al ser un cron job separado y sincrono es más sencillo detectar incosistencias o errores individuales:
+
+<img width="1354" height="343" alt="image" src="https://github.com/user-attachments/assets/0b283e14-80d9-4837-81bd-ebb2926328d5" />
+
+
+<img width="1051" height="185" alt="image" src="https://github.com/user-attachments/assets/6806b945-7d21-4b96-8249-de58be63c63c" />
+
+
+````main.java
+@Component
+public class OutboxEventReader implements CommandLineRunner {
+
+    @Autowired
+    private OutboxTableRepository outboxTableRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private KafkaTemplate<String, ExampleEntity> kafkaTemplate;
+
+    @Autowired
+    private PersonsRepository personsRepository;
+
+    @Autowired
+    private OutboxEventReader eventReader;
+
+    enum OutboxStatus {
+        PENDING, SENT, FAILED,DONE
+    }
+
+    // Implement the run method to read the outbox table and send the events to
+    // Kafka,EVERY 5 seconds
+    @Override
+    public void run(String... args) throws Exception {
+        while (true) {
+            List<OutboxEvent> events = outboxTableRepository
+                    .findByStatusIn(List.of(OutboxStatus.PENDING.name(), OutboxStatus.FAILED.name()));
+
+            for (OutboxEvent outboxEvent : events) {
+                // Cada evento se procesa en su propia transacción
+                // Si uno falla, el bucle continúa con el siguiente
+                eventReader.processEvent(outboxEvent);
+            }
+
+            Thread.sleep(1200);
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processEvent(OutboxEvent outboxEvent) {
+        try {
+            ExampleEntity entity = objectMapper.readValue(outboxEvent.getPayload(), ExampleEntity.class);
+
+            System.out.println("Procesando: " + entity);
+
+            // Enviar a Kafka y esperar confirmación
+               kafkaTemplate.send("outbox-ejemplo", entity).get(20, TimeUnit.SECONDS);
+
+
+            // Marcar el evento original como DONE
+            outboxEvent.setStatus(OutboxStatus.DONE.name());
+            outboxTableRepository.save(outboxEvent);
+
+            // Crear un nuevo registro de auditoría como SENT
+            eventReader.saveOutbox(outboxEvent, entity);
+
+
+            
+        } catch (Exception e) {
+            System.err.println("Error procesando evento ID " + outboxEvent.getId() + ": " + e.getMessage());
+
+            } catch (Exception e) {
+            System.err.println("Error procesando evento ID " + outboxEvent.getId() + ": " + e.getMessage());
+
+             // catch anidado: si el save(FAILED) también falla, no rompe el for,
+             //seguiria en pending si falla el segundo save
+            try {
+                outboxEvent.setStatus(OutboxStatus.FAILED.name());
+                outboxTableRepository.save(outboxEvent);
+            } catch (Exception dbException) {
+                // BD caída — no podemos persistir, solo logueamos
+                // El evento quedará como PENDING en BD cuando vuelva
+                System.err.println("No se pudo marcar como FAILED (¿BD caída?): " + dbException.getMessage());
+                // Aquí podrías mandar alerta, métricas, etc.
+            }
+        }
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveOutbox(OutboxEvent outboxEvent,ExampleEntity entity){
+    
+            OutboxEvent sentEvent = OutboxEvent.builder()
+                    .type("SentEventExample")
+                    .payload(outboxEvent.getPayload())
+                    .entityId(entity.getId())
+                    .status(OutboxStatus.SENT.name())
+                    .version(outboxEvent.getVersion() + 1)
+                    .build();
+
+            outboxTableRepository.save(sentEvent);
+           // throw new RuntimeException("sdasdasdsad");
+
+        
+    }
+}
+
+````
+
+Esta implementación actua en modo de que, si la transacción uno falla, en el catch lo guardará como failed, si falla el catch, el
+row seguira como pending y no romperá el primer flujo. Si falla la segunda transacción, no estará insertando nada del SentEventExample.
+
+Y así es como creas un message relay, usas un kafaTemplate.send(...).get para esperar la conexión de manera bloqueante, es lo
+adecuado, con un time limit para que el hilo no quede colgante.
+
+Y con estos escenarios, ya tienes un relay y ya suscribes un consumer a micro b, este lo procesa y cuando procese el pojo finalmente en su WRITE DATABASE, manda otro 
+evento a la tabla outbox. Pudieras hacerlo con un worker o cache en segundo plano, para que sea asincrono y no te falle el método final
+al confirmar todo el flujo eventual de tu outbox y del flujo predeterminado.
+
+Y el version recuerda que va incremental, esto se ve por las pruevbas, mucho cuidado si en una columna del relay usas @Version
+
+<img width="325" height="77" alt="image" src="https://github.com/user-attachments/assets/ea1ef391-1123-4ee4-a4d2-a9c9d0a2060c" />
+
+Si usas esa anotación, te va a corromper tus columnas, procura mejor quitar esa anotación en relays.
+
+
+La otra manera elegante de resolver esto es usando debezium, pero por ahora tenemos en cuenta esta implementación manual.
+
+Prueba componente de relay a consumer exitosa: 
+
+<img width="2524" height="818" alt="image" src="https://github.com/user-attachments/assets/b4d0764d-2d35-4a44-9433-b34e58252582" />
+
+<img width="888" height="188" alt="image" src="https://github.com/user-attachments/assets/15fe55c1-eb73-441a-84d8-7c11a6698af2" />
+
+<img width="760" height="1056" alt="image" src="https://github.com/user-attachments/assets/43dddb02-84aa-4f5b-b4bd-05686239c670" />
+
+
+Prueba E2E:
+
+<img width="1206" height="1009" alt="image" src="https://github.com/user-attachments/assets/90fc5a79-11d3-42c4-9db4-c3a69f1ef5b1" />
+
+<img width="1976" height="1439" alt="image" src="https://github.com/user-attachments/assets/f22c24be-468e-4e5e-84d2-b81b6c4cacfc" />
+
+
+Prueba exitosa. Estas pruebas las hago en local, me ahorro por ahora la molestia de meterlo a kube porque tengo otros temas que estudiar.
+No confundan flojera con capacidad de favor.
+
+## apache jmeter testing
+
+Por último solo lanzaremos un par de peticiones para aprender a manejar esta herramienta.
+
+Número de hilos: número de usuarios concurrentes.
+
+Periodo de suposición: cuantos llegan por segundo.}
+
+Contador de bucle cuantas veces los hilos deben repetir la operación
+
+Asi como lo configuré se entiende que 100 usuarios llegaran en grupos de 5 segundos, repetirán la operación cada uno
+10 veces. Cuando acabe, solo pasaran 500 ms para que repita la acción
+
+<img width="748" height="325" alt="image" src="https://github.com/user-attachments/assets/f713715b-4154-4947-b780-8a5f760aca18" />
+
+
+<img width="1513" height="382" alt="image" src="https://github.com/user-attachments/assets/abced9f9-a9b3-4324-9962-d334eb02cd86" />
+
+
+Se puede observar que los registros son consecutivos y eventuales, porque kafka y el outbox aseguran el orden de 
+la entrega de tu evento
+
+<img width="1565" height="1053" alt="image" src="https://github.com/user-attachments/assets/0a12faab-6c3f-4828-a033-b4d583390135" />
+
+
+Así terminamos esta práctica. Ahora sabemos orquestar sagas ¿El límite? nuestra imaginación.
+
